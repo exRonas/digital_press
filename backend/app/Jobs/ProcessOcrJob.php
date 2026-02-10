@@ -99,7 +99,7 @@ class ProcessOcrJob implements ShouldQueue
                 Log::info("[OCR] Processing page " . ($index + 1) . "/" . count($files));
                 
                 $tessProcess = new Process([$tesseractPath, $imagePath, 'stdout', '-l', $ocrLang]);
-                $tessProcess->setTimeout(120);
+                $tessProcess->setTimeout(600);
                 $tessProcess->run();
 
                 if (!$tessProcess->isSuccessful()) {
