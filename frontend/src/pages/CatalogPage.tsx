@@ -183,7 +183,7 @@ const SidebarFilters = ({
 };
 
 export default function CatalogPage() {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
     

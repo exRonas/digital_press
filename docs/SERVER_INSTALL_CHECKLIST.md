@@ -144,8 +144,8 @@ pdftoppm -v
 1.  Откройте pgAdmin 4 (устанавливается вместе с Postgres) или используйте консоль `psql`.
 2.  Создайте пользователя и базу данных:
     ```sql
-    CREATE USER box_user WITH PASSWORD 'StrongPassword123';
-    CREATE DATABASE digital_press OWNER box_user;
+        CREATE USER box_user WITH PASSWORD 'VeryStr$ngP1assword';
+        CREATE DATABASE digital_press OWNER box_user;
     ```
 3.  Расширения для поиска (если требуются специфические словари, убедитесь, что они установлены).
 

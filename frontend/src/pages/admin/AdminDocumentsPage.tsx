@@ -68,7 +68,6 @@ interface Meta {
 
 export function AdminDocumentsPage() {
   const [issues, setIssues] = useState<Issue[]>([])
-  const [publications, setPublications] = useState<Publication[]>([])
   const [loading, setLoading] = useState(true)
   const [meta, setMeta] = useState<Meta | null>(null)
   const [page, setPage] = useState(1)
@@ -94,13 +93,6 @@ export function AdminDocumentsPage() {
   const [deleting, setDeleting] = useState(false)
   
   const { toast } = useToast()
-
-  // Fetch publications for reference
-  useEffect(() => {
-    axios.get('/publications')
-      .then(res => setPublications(res.data))
-      .catch(err => console.error(err))
-  }, [])
 
   // Debounce search
   useEffect(() => {
@@ -165,7 +157,7 @@ export function AdminDocumentsPage() {
       // Refresh list
       setIssues(issues.map(i => 
         i.id === editingIssue.id 
-          ? { ...i, ...editForm } 
+          ? { ...i, ...editForm, language: editForm.language as any } 
           : i
       ))
     } catch (err: any) {

@@ -15,7 +15,6 @@ import {
     Loader2,
     FileText,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 // PDF.js worker
 // @ts-expect-error - worker import

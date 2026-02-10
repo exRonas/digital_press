@@ -1,7 +1,7 @@
 "use client"
 
 import { Link } from "react-router-dom"
-import { Eye, Newspaper } from "lucide-react"
+import { Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAccessibility } from "@/components/accessibility-provider"
 
