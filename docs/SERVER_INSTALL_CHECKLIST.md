@@ -195,20 +195,19 @@ pdftoppm -v
 
 ## 8. Сборка Frontend
 
-1.  Перейдите в корень проекта (где `package.json` от React):
-    ```powershell
-    cd C:\inetpub\digital_press
-    ```
-    *(Если ваш frontend в отдельной папке `frontend`, перейдите туда)*.
+В этом проекте используется **автоматический скрипт** для сборки React-приложения и интеграции его в Laravel.
 
-2.  Установите зависимости и соберите проект:
+1.  Откройте PowerShell в корне проекта (где папки `scripts`, `frontend`, `backend`).
+2.  Запустите скрипт сборки:
     ```powershell
-    npm install
-    npm run build
+    .\scripts\build_deploy.ps1
     ```
-3.  После сборки папка `dist` (или `build`) должна быть скопирована в `backend/public` или настроена в Nginx.
-    *   В текущей конфигурации Vite обычно собирает в `backend/public` или генерирует ассеты, которые Laravel подхватывает.
-    *   Если сборка идет в отдельную папку `dist`, скопируйте её содержимое в `backend/public` (но будьте осторожны, чтобы не стереть `index.php`).
+    *Что делает этот скрипт:*
+    *   Собирает React проект (`npm run build`).
+    *   Копирует JS/CSS файлы в `backend/public/assets`.
+    *   Превращает `index.html` в `backend/resources/views/index.blade.php`.
+
+    *Если скрипт прошел успешно (зеленые сообщения), переходите к следующему шагу.*
 
 ---
 
