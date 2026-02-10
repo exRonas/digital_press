@@ -137,6 +137,14 @@ class CompressPdfJob implements ShouldQueue
                      'file_size' => $newSize
                  ]);
 
+                 // Generate Thumbnail immediately after compression
+                 try {
+                     $this->generateThumbnail($outputPath, $file->issue);
+                     Log::info("[CompressPdfJob] Thumbnail generated for Issue #{$file->issue->id}");
+                 } catch (Exception $e) {
+                     Log::error("[CompressPdfJob] Thumbnail generation failed: " . $e->getMessage());
+                 }
+
                  Log::info("[CompressPdfJob] Dispatching OCR for Issue #{$file->issue->id}");
                  ProcessOcrJob::dispatch($file->issue);
             }
@@ -155,6 +163,97 @@ class CompressPdfJob implements ShouldQueue
             // For now, failure stops the pipeline.
             
             throw $e;
+        }
+    }
+
+    /**
+     * Generate thumbnail from the first page of the PDF.
+     */
+    private function generateThumbnail(string $pdfPath, $issue): void
+    {
+        // Create temp folder
+        $tempDir = storage_path('app/temp/thumb_' . $issue->id . '_' . time());
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+
+        try {
+            // Poppler Path
+            $popplerPath = env('POPPLER_PATH', 'C:\\poppler\\bin');
+            $pdftoppmCmd = "{$popplerPath}\\pdftoppm.exe";
+
+            // Run pdftoppm
+            $process = new Process([
+                $pdftoppmCmd,
+                '-png',
+                '-r', '150',
+                '-f', '1',
+                '-l', '1',
+                $pdfPath,
+                $tempDir . '/page'
+            ]);
+            $process->setTimeout(60);
+            $process->run();
+
+            if (!$process->isSuccessful()) {
+                throw new Exception("pdftoppm failed: " . $process->getErrorOutput());
+            }
+
+            // Find valid image
+            $files = glob($tempDir . '/page-*.png');
+            if (empty($files)) {
+                 // Try one more time with .pbm if png failed silently or just no files
+                 throw new Exception("No generated image found");
+            }
+            $sourcePath = $files[0];
+
+            // Resize (using GD)
+            $sourceImage = imagecreatefrompng($sourcePath);
+            if (!$sourceImage) {
+                 throw new Exception("Failed to open generated PNG");
+            }
+            
+            $width = imagesx($sourceImage);
+            $height = imagesy($sourceImage);
+            $targetWidth = 400;
+            $targetHeight = (int) ($height * ($targetWidth / $width));
+
+            $thumbnail = imagecreatetruecolor($targetWidth, $targetHeight);
+            $white = imagecolorallocate($thumbnail, 255, 255, 255);
+            imagefill($thumbnail, 0, 0, $white);
+
+            imagecopyresampled(
+                $thumbnail, $sourceImage,
+                0, 0, 0, 0,
+                $targetWidth, $targetHeight,
+                $width, $height
+            );
+
+            // Save Thumbnail
+            $thumbRelPath = "thumbnails/issue_{$issue->id}.jpg";
+            $thumbAbsPath = Storage::disk('public')->path($thumbRelPath);
+            
+            // Ensure dir exists
+            $thumbDir = dirname($thumbAbsPath);
+            if (!is_dir($thumbDir)) {
+                mkdir($thumbDir, 0755, true);
+            }
+
+            imagejpeg($thumbnail, $thumbAbsPath, 85);
+
+            // Cleanup resources
+            imagedestroy($sourceImage);
+            imagedestroy($thumbnail);
+
+            // Update Issue
+            $issue->update(['thumbnail_path' => $thumbRelPath]);
+
+        } finally {
+            // Cleanup temp
+            if (is_dir($tempDir)) {
+                array_map('unlink', glob("$tempDir/*.*"));
+                rmdir($tempDir);
+            }
         }
     }
 }
