@@ -8,6 +8,7 @@ use App\Models\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
 use App\Jobs\ProcessOcrJob; 
 
@@ -277,30 +278,37 @@ class IssueController extends Controller
         
         // Generate unique filename
         $uuid = Str::uuid();
-        $year = date('Y', strtotime($request->issue_date));
-        $storedPath = "private/pdfs/{$year}/{$uuid}.pdf";
-
+        
+        // 1. Save Original File
+        // Using config path for originals: storage/app/pdf/original
+        $originalPathReq = Config::get('pdf.paths.original', 'pdf/original');
+        $extension = $uploadedFile->getClientOriginalExtension() ?: 'pdf';
+        
         // Ensure directory exists
-        $directory = storage_path("app/private/pdfs/{$year}");
-        if (!is_dir($directory)) {
-            mkdir($directory, 0755, true);
+        if (!Storage::exists($originalPathReq)) {
+            Storage::makeDirectory($originalPathReq);
         }
 
-        // Store file in private storage (NOT public)
-        $uploadedFile->storeAs("private/pdfs/{$year}", "{$uuid}.pdf");
+        $originalStoredPath = $uploadedFile->storeAs($originalPathReq, "{$uuid}.{$extension}");
 
-        // Calculate SHA256 for integrity
-        $fullPath = storage_path("app/{$storedPath}");
-        $sha256 = hash_file('sha256', $fullPath);
+        // Calculate initial stats
+        $fullOriginalPath = Storage::path($originalStoredPath);
+        $sha256 = hash_file('sha256', $fullOriginalPath);
+        $size = filesize($fullOriginalPath);
 
         DB::beginTransaction();
         try {
-            // Create File record first
+            // Create File record
+            // Initial status is 'uploaded'
+            // 'stored_path' points to original initially, but will be updated by CompressPdfJob
+            // 'original_path' keeps the reference to source
             $file = File::create([
                 'original_name' => $uploadedFile->getClientOriginalName(),
-                'stored_path' => $storedPath,
-                'mime_type' => $uploadedFile->getMimeType() ?? 'application/pdf',
-                'size' => $uploadedFile->getSize(),
+                'stored_path' => $originalStoredPath, // Initially point to original
+                'original_path' => $originalStoredPath,
+                'status' => 'uploaded',
+                'mime_type' => 'application/pdf', // Enforced by validation
+                'size' => $size,
                 'sha256' => $sha256,
                 'uploaded_by' => $request->user()->id,
             ]);
@@ -311,10 +319,10 @@ class IssueController extends Controller
                 'issue_date' => $request->issue_date,
                 'issue_number' => $request->issue_number,
                 'language' => $request->language,
-                'file_path' => $storedPath, // Keep for legacy compatibility
+                'file_path' => $file->stored_path, // Keep for legacy compatibility
                 'file_id' => $file->id,     // New file relation
-                'file_size' => $uploadedFile->getSize(),
-                'mime_type' => $uploadedFile->getMimeType(),
+                'file_size' => $file->size,
+                'mime_type' => $file->mime_type,
                 'created_by' => $request->user()->id,
             ]);
 
@@ -327,27 +335,22 @@ class IssueController extends Controller
             // Init OCR status
             $issue->ocrResult()->create(['status' => 'queued']);
             
-            // Dispatch Job (Step 5)
-            ProcessOcrJob::dispatch($issue);
-
             DB::commit();
-            
-            \Log::info('Issue created with new file system', [
-                'issue_id' => $issue->id,
-                'file_id' => $file->id,
-                'stored_path' => $storedPath,
-            ]);
-            
-            return response()->json($issue->load('file'), 201);
+
+            // Dispatch Compression Job
+            \App\Jobs\CompressPdfJob::dispatch($file); 
+
+            return response()->json([
+                'message' => 'Issue created successfully. Processing started (Compression -> OCR).',
+                'id' => $issue->id
+            ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            // Cleanup file
-            if (file_exists($fullPath)) {
-                unlink($fullPath);
-            }
-            \Log::error('Upload failed', ['error' => $e->getMessage()]);
-            return response()->json(['message' => 'Upload failed: ' . $e->getMessage()], 500);
+            // Cleanup file if DB failed
+            Storage::delete($originalStoredPath);
+            \Log::error('Issue create failed: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to create issue: ' . $e->getMessage()], 500);
         }
     }
 

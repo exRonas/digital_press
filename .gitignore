@@ -34,6 +34,7 @@ frontend/node_modules/
 # Backend (Laravel)
 backend/vendor/
 backend/node_modules/
+backend/public/build/
 backend/public/hot
 backend/public/storage
 backend/storage/*.key
@@ -45,13 +46,17 @@ backend/homestead.json
 backend/homestead.yaml
 backend/auth.json
 
+backend/storage/app/public/*
+!backend/storage/app/public/.gitignore
+backend/storage/app/private/*
+!backend/storage/app/private/.gitignore
+
 backend/storage/framework/cache/data/*
 backend/storage/framework/sessions/*
 backend/storage/framework/views/*
 backend/storage/framework/testing/*
 backend/storage/logs/*
 
-!backend/storage/app/public/.gitignore
 !backend/storage/framework/cache/data/.gitignore
 !backend/storage/framework/sessions/.gitignore
 !backend/storage/framework/views/.gitignore

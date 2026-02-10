@@ -1,542 +1,310 @@
-# Установка на сервер: полная инструкция
+# Руководство по установке на Windows Server 2019
 
-Чеклист для продакшн‑развертывания системы **"Цифровой банк печати"** (Laravel + React + Nginx + OCR).
+Полная инструкция по развертыванию системы **"Цифровой банк печати"** на сервере под управлением Windows Server 2019.
 
-**Версия:** 2.0  
-**Обновлено:** Январь 2026
+**Версия:** 3.0 (Windows Edition)  
+**Обновлено:** Февраль 2026
 
 ---
 
 ## Содержание
 
-1. [Требования к серверу](#1-требования-к-серверу)
-2. [Установка пакетов](#2-установка-пакетов)
-3. [Загрузка проекта](#3-загрузка-проекта)
-4. [Настройка Backend (Laravel)](#4-настройка-backend-laravel)
-5. [Настройка базы данных](#5-настройка-базы-данных)
-6. [Настройка OCR](#6-настройка-ocr)
-7. [Сборка Frontend](#7-сборка-frontend)
-8. [Настройка Nginx](#8-настройка-nginx)
-9. [Запуск очереди (Supervisor)](#9-запуск-очереди-supervisor)
-10. [SSL сертификат](#10-ssl-сертификат)
-11. [Финальная проверка](#11-финальная-проверка)
-12. [Резервное копирование](#12-резервное-копирование)
-13. [Обновление системы](#13-обновление-системы)
-14. [Диагностика ошибок](#14-диагностика-ошибок)
+1. [Предварительные требования](#1-предварительные-требования)
+2. [Подготовка окружения и установка программ](#2-подготовка-окружения-и-установка-программ)
+3. [Настройка переменных среды (PATH)](#3-настройка-переменных-среды-path)
+4. [Установка компонентов OCR и PDF](#4-установка-компонентов-ocr-и-pdf)
+5. [Развертывание кодовой базы](#5-развертывание-кодовой-базы)
+6. [Настройка Базы Данных (PostgreSQL)](#6-настройка-базы-данных-postgresql)
+7. [Настройка Backend](#7-настройка-backend)
+8. [Сборка Frontend](#8-сборка-frontend)
+9. [Настройка веб-сервера (Nginx)](#9-настройка-веб-сервера-nginx)
+10. [Настройка автозапуска служб (NSSM)](#10-настройка-автозапуска-служб-nssm)
 
 ---
 
-## 1. Требования к серверу
+## 1. Предварительные требования
 
-| Компонент | Минимум | Рекомендуется |
-|-----------|---------|---------------|
-| CPU | 2 ядра | 4 ядра |
-| RAM | 4 GB | 8 GB (для OCR) |
-| Диск | 50 GB | 200 GB+ |
-| ОС | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
-
----
-
-## 2. Установка пакетов
-
-```bash
-sudo apt update && sudo apt upgrade -y
-
-# PHP 8.2 + расширения
-sudo apt install php8.2-fpm php8.2-cli php8.2-mbstring php8.2-xml \
-  php8.2-curl php8.2-zip php8.2-pgsql php8.2-bcmath php8.2-gd
-
-# Nginx
-sudo apt install nginx
-
-# PostgreSQL
-sudo apt install postgresql postgresql-contrib
-
-# OCR (Tesseract + Poppler)
-sudo apt install tesseract-ocr tesseract-ocr-rus tesseract-ocr-kaz poppler-utils
-
-# Node.js 18+
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt install nodejs
-
-# Composer
-curl -sS https://getcomposer.org/installer | php
-sudo mv composer.phar /usr/local/bin/composer
-
-# Supervisor (для очереди)
-sudo apt install supervisor
-
-# Утилиты
-sudo apt install git unzip
-```
-
-### Проверка установки:
-```bash
-php -v           # PHP 8.2.x
-nginx -v         # nginx/1.x
-psql --version   # PostgreSQL 14+
-tesseract -v     # tesseract 4.x или 5.x
-pdftoppm -v      # poppler-utils
-node -v          # v18.x
-composer -V      # Composer 2.x
-```
+*   **ОС:** Windows Server 2019 (64-bit)
+*   **CPU:** Минимум 4 ядра (для нормальной работы OCR)
+*   **RAM:** Минимум 8 ГБ (OCR потребляет много памяти)
+*   **Диск:** SSD, размер зависит от архива (рекомендуется от 200 ГБ)
+*   **Права:** Администраторский доступ к серверу (RDP)
 
 ---
 
-## 3. Загрузка проекта
+## 2. Подготовка окружения и установка программ
 
-```bash
-# Создать директорию
-sudo mkdir -p /var/www/digital-press
-sudo chown $USER:$USER /var/www/digital-press
-cd /var/www/digital-press
+Все программы рекомендуется устанавливать в корень диска `C:\` или в `C:\Server\` для упрощения путей и избежания проблем с пробелами в `Program Files`.
 
-# Клонировать репозиторий
-git clone https://your-repo-url.git .
-# Или загрузить архив и распаковать
-```
+### 2.1. Основные компоненты
 
----
-
-## 4. Настройка Backend (Laravel)
-
-```bash
-cd /var/www/digital-press/backend
-
-# Установить зависимости
-composer install --no-dev --optimize-autoloader
-
-# Создать .env
-cp .env.example .env
-nano .env
-```
-
-### Настройки .env:
-
-```env
-APP_NAME="Цифровой банк печати"
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://your-domain.kz
-
-# База данных
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=digital_press
-DB_USERNAME=digital_press_user
-DB_PASSWORD=СЛОЖНЫЙ_ПАРОЛЬ_МИНИМУМ_32_СИМВОЛА
-
-# Очередь
-QUEUE_CONNECTION=database
-
-# OCR (пути для Ubuntu)
-TESSERACT_PATH=/usr/bin/tesseract
-POPPLER_PATH=/usr/bin
-OCR_LANG=rus+kaz
-
-# Сессии и кэш
-SESSION_DRIVER=file
-CACHE_DRIVER=file
-```
-
-### Продолжение настройки:
-
-```bash
-# Сгенерировать ключ приложения
-php artisan key:generate
-
-# Создать symbolic link для публичных файлов
-php artisan storage:link
-
-# Права доступа
-sudo chown -R www-data:www-data storage bootstrap/cache
-sudo chmod -R 775 storage bootstrap/cache
-```
+1.  **PHP 8.2 или 8.3 (Non Thread Safe):**
+    *   Скачать zip c [windows.php.net](https://windows.php.net/download/).
+    *   Распаковать в `C:\php`.
+    *   Переименовать `php.ini-production` в `php.ini`.
+2.  **PostgreSQL 14+:**
+    *   Скачать инсталлятор с [postgresql.org](https://www.postgresql.org/download/windows/).
+    *   Установить. Запомнить пароль суперпользователя `postgres`.
+3.  **Nginx:**
+    *   Скачать stable версию с [nginx.org](https://nginx.org/en/download.html).
+    *   Распаковать в `C:\nginx`.
+4.  **Node.js (LTS):**
+    *   Скачать и установить с [nodejs.org](https://nodejs.org/).
+5.  **Git:**
+    *   Скачать и установить с [git-scm.com](https://git-scm.com/).
+6.  **Composer:**
+    *   Скачать и установить `Composer-Setup.exe` с [getcomposer.org](https://getcomposer.org/).
+7.  **Visual C++ Redistributable:**
+    *   Установить последнюю версию (необходима для PHP и других библиотек).
 
 ---
 
-## 5. Настройка базы данных
+## 3. Настройка переменных среды (PATH)
 
-### Создать БД и пользователя:
+Добавьте следующие пути в системную переменную `Path` (Панель управления -> Система -> Дополнительные параметры системы -> Переменные среды):
 
-```bash
-sudo -u postgres psql
-```
+*   `C:\php`
+*   `C:\nginx`
+*   `C:\Program Files\Git\cmd`
+*   Путь к Composer (обычно добавляется автоматически)
 
-```sql
-CREATE USER digital_press_user WITH PASSWORD 'ваш_сложный_пароль';
-CREATE DATABASE digital_press OWNER digital_press_user;
-GRANT ALL PRIVILEGES ON DATABASE digital_press TO digital_press_user;
-\q
-```
-
-### Выполнить миграции:
-
-```bash
-cd /var/www/digital-press/backend
-
-# Создать таблицы
-php artisan migrate --force
-
-# Создать администратора
-php artisan db:seed --class=UserSeeder
-```
-
-**⚠️ Учётные данные по умолчанию:**
-```
-Логин: admin
-Пароль: password
-```
-**ОБЯЗАТЕЛЬНО СМЕНИТЕ ПАРОЛЬ СРАЗУ ПОСЛЕ ВХОДА!**
-
----
-
-## 6. Настройка OCR
-
-OCR извлекает текст из PDF для полнотекстового поиска.
-
-### Проверка Tesseract:
-
-```bash
-# Версия
-tesseract --version
-
-# Установленные языки (должны быть rus, kaz)
-tesseract --list-langs
-
-# Тест распознавания
-tesseract test_image.png output -l rus+kaz
-```
-
-### Проверка Poppler:
-
-```bash
-# Версия
-pdftoppm -v
-
-# Тест конвертации PDF → изображение
-pdftoppm -png -r 72 -f 1 -l 1 -singlefile test.pdf output
-```
-
-### Пути в .env (Ubuntu):
-
-```env
-TESSERACT_PATH=/usr/bin/tesseract
-POPPLER_PATH=/usr/bin
-OCR_LANG=rus+kaz
-```
-
-### Пути в .env (Windows):
-
-```env
-TESSERACT_PATH=C:/Program Files/Tesseract-OCR/tesseract.exe
-POPPLER_PATH=C:/poppler/Library/bin
-OCR_LANG=rus+kaz
-```
-
-> **Важно:** На Windows используйте ПРЯМЫЕ слеши `/` вместо обратных `\`
-
----
-
-## 7. Сборка Frontend
-
-```bash
-cd /var/www/digital-press/frontend
-npm install
-npm run build
-```
-
-Результат: папка `frontend/dist/` с собранными файлами.
-
----
-
-## 8. Настройка Nginx
-
-### Скопировать конфиг:
-
-```bash
-sudo cp /var/www/digital-press/nginx/digital-press-production.conf \
-        /etc/nginx/sites-available/digital-press
-
-# Отредактировать домен
-sudo nano /etc/nginx/sites-available/digital-press
-```
-
-### Изменить в конфиге:
-- `server_name your-domain.kz;` — ваш домен
-- Проверить пути к проекту
-
-### Включить сайт:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/digital-press /etc/nginx/sites-enabled/
-
-# Удалить default сайт (опционально)
-sudo rm /etc/nginx/sites-enabled/default
-
-# Проверить конфигурацию
-sudo nginx -t
-
-# Перезагрузить
-sudo systemctl reload nginx
-```
-
----
-
-## 9. Запуск очереди (Supervisor)
-
-Очередь нужна для обработки OCR в фоновом режиме.
-
-### Создать конфиг Supervisor:
-
-```bash
-sudo nano /etc/supervisor/conf.d/digital-press-worker.conf
-```
-
+**Включение расширений PHP:**
+Откройте `C:\php\php.ini` и раскомментируйте (уберите `;`) следующие строки:
 ```ini
-[program:digital-press-worker]
-process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/digital-press/backend/artisan queue:work --sleep=3 --tries=3 --max-time=3600
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-numprocs=2
-redirect_stderr=true
-stdout_logfile=/var/www/digital-press/backend/storage/logs/worker.log
-stopwaitsecs=3600
+extension_dir = "ext"
+extension=curl
+extension=fileinfo
+extension=gd
+extension=mbstring
+extension=openssl
+extension=pdo_pgsql
+extension=pgsql
 ```
 
-### Запустить:
-
-```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl start digital-press-worker:*
-
-# Проверить статус
-sudo supervisorctl status
+Также настройте лимиты загрузки в `php.ini` (для больших PDF):
+```ini
+upload_max_filesize = 500M
+post_max_size = 500M
+memory_limit = 1024M
+max_execution_time = 300
 ```
 
 ---
 
-## 10. SSL сертификат
+## 4. Установка компонентов OCR и PDF
 
-### Let's Encrypt (бесплатно):
+Для работы сжатия и распознавания текста необходимы сторонние утилиты.
 
-```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.kz
+### 4.1. Ghostscript (для сжатия PDF)
+1.  Скачать Windows (64 bit) версию c [ghostscript.com](https://www.ghostscript.com/releases/gsdnld.html).
+2.  Установить.
+3.  Найти путь к исполняемому файлу (обычно `C:\Program Files\gs\gs10.XX\bin\gswin64c.exe`).
+4.  Добавить папку `bin` в **PATH**.
+
+### 4.2. Tesseract OCR (для распознавания текста)
+1.  Скачать инсталлятор (например, от UB-Mannheim) [github.com/UB-Mannheim/tesseract/wiki](https://github.com/UB-Mannheim/tesseract/wiki).
+2.  Установить в `C:\Program Files\Tesseract-OCR` (или путь без пробелов, например `C:\Tesseract-OCR`).
+3.  При установке **обязательно** выбрать языковые пакеты: **Russian**, **Kazakh** (если есть, иначе придется качать отдельно), **English**.
+4.  Если языка нет в инсталляторе, скачать файлы `.traineddata` (rus, kaz, eng) и положить в папку `tessdata`.
+5.  Добавить папку с `tesseract.exe` в **PATH**.
+
+### 4.3. Poppler (для конвертации PDF в картинки)
+1.  Скачать Windows-сборку (Release) с [github.com/oschwartz10612/poppler-windows/releases](https://github.com/oschwartz10612/poppler-windows/releases).
+2.  Распаковать архив.
+3.  Скопировать папку куда-нибудь, например в `C:\poppler`.
+4.  Добавить путь `C:\poppler\bin` (где лежит `pdftoppm.exe`) в **PATH**.
+
+**Проверка:**
+Откройте **новый** PowerShell (от администратора) и проверьте команды:
+```powershell
+php -v
+gswin64c --version
+tesseract --version
+pdftoppm -v
 ```
-
-### Автообновление:
-
-```bash
-# Проверить
-sudo certbot renew --dry-run
-```
-
-Certbot автоматически добавляет задание в cron.
+Все команды должны работать без ошибок.
 
 ---
 
-## 11. Финальная проверка
+## 5. Развертывание кодовой базы
 
-### ✅ Чеклист:
+Предположим, проект будет находиться в `C:\inetpub\digital_press`.
 
-- [ ] Сайт открывается по HTTPS
-- [ ] Каталог загружается, фильтры работают
-- [ ] **Миниатюры газет отображаются**
-- [ ] PDF открывается в просмотрщике
-- [ ] PDF скачивается
-- [ ] Вход в админку работает (`/admin`)
-- [ ] Загрузка новых PDF работает
-- [ ] После загрузки PDF создаётся миниатюра
-- [ ] OCR запускается автоматически
-- [ ] Поиск по тексту работает
-
-### Проверка OCR:
-
-```bash
-# Статус воркера
-sudo supervisorctl status
-
-# Лог воркера
-tail -f /var/www/digital-press/backend/storage/logs/worker.log
-
-# Лог Laravel (OCR события)
-tail -f /var/www/digital-press/backend/storage/logs/laravel.log | grep OCR
-```
-
-### Проверка статуса OCR в БД:
-
-```bash
-cd /var/www/digital-press/backend
-php check_ocr_status.php
-```
+1.  Создайте папку:
+    ```powershell
+    mkdir C:\inetpub\digital_press
+    cd C:\inetpub\digital_press
+    ```
+2.  Скопируйте файлы проекта (через Git clone или просто скопировав архив с файлами).
 
 ---
 
-## 12. Резервное копирование
+## 6. Настройка Базы Данных (PostgreSQL)
 
-### Что бэкапить:
-
-| Что | Путь | Важность |
-|-----|------|----------|
-| База данных | PostgreSQL dump | **Критично** |
-| PDF файлы | `storage/app/public/issues/` | **Критично** |
-| Миниатюры | `storage/app/public/thumbnails/` | Можно восстановить |
-| Конфиг | `backend/.env` | **Критично** |
-
-### Скрипт бэкапа:
-
-```bash
-#!/bin/bash
-BACKUP_DIR="/backups/digital-press"
-DATE=$(date +%Y-%m-%d)
-mkdir -p $BACKUP_DIR
-
-# БД
-pg_dump -U digital_press_user digital_press > $BACKUP_DIR/db_$DATE.sql
-
-# Файлы
-rsync -av /var/www/digital-press/backend/storage/app/public/issues/ $BACKUP_DIR/pdfs/
-rsync -av /var/www/digital-press/backend/storage/app/public/thumbnails/ $BACKUP_DIR/thumbnails/
-
-# Конфиг
-cp /var/www/digital-press/backend/.env $BACKUP_DIR/env_$DATE.backup
-
-# Удалить старые (30 дней)
-find $BACKUP_DIR -name "*.sql" -mtime +30 -delete
-```
-
-### Добавить в cron (ежедневно в 3:00):
-
-```bash
-crontab -e
-# Добавить:
-0 3 * * * /opt/backup-digital-press.sh
-```
+1.  Откройте pgAdmin 4 (устанавливается вместе с Postgres) или используйте консоль `psql`.
+2.  Создайте пользователя и базу данных:
+    ```sql
+    CREATE USER box_user WITH PASSWORD 'StrongPassword123';
+    CREATE DATABASE digital_press OWNER box_user;
+    ```
+3.  Расширения для поиска (если требуются специфические словари, убедитесь, что они установлены).
 
 ---
 
-## 13. Обновление системы
+## 7. Настройка Backend
 
-```bash
-cd /var/www/digital-press
+1.  Перейдите в папку `backend`:
+    ```powershell
+    cd C:\inetpub\digital_press\backend
+    ```
+2.  Установите зависимости PHP:
+    ```powershell
+    composer install --optimize-autoloader --no-dev
+    ```
+3.  Настройте файл `.env`:
+    ```powershell
+    copy .env.example .env
+    notepad .env
+    ```
+    *   Установите `APP_ENV=production`.
+    *   Установите `APP_DEBUG=false`.
+    *   Укажите `APP_URL=http://ваш-ip-адрес`.
+    *   Настройте подключение к БД (`DB_USERNAME`, `DB_PASSWORD` из шага 6).
+    *   **ВАЖНО:** Пропишите пути к утилитам (если они не в PATH или для надежности):
+        ```dotenv
+        GHOSTSCRIPT_PATH="C:\\Program Files\\gs\\gs10.04.0\\bin\\gswin64c.exe"
+        TESSERACT_PATH="C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+        POPPLER_PATH="C:\\poppler\\bin"
+        ```
+    *   Настройте диск для файлов на `public`:
+        ```dotenv
+        FILESYSTEM_DISK=public
+        ```
 
-# Получить изменения
-git pull origin main
-
-# Backend
-cd backend
-composer install --no-dev --optimize-autoloader
-php artisan migrate --force
-php artisan cache:clear
-php artisan config:clear
-
-# Frontend
-cd ../frontend
-npm install
-npm run build
-
-# Перезапустить воркеры
-sudo supervisorctl restart digital-press-worker:*
-
-# Перезагрузить PHP-FPM (если изменился код)
-sudo systemctl reload php8.2-fpm
-```
-
----
-
-## 14. Диагностика ошибок
-
-### Логи:
-
-```bash
-# Nginx
-sudo tail -f /var/log/nginx/error.log
-
-# Laravel
-tail -f /var/www/digital-press/backend/storage/logs/laravel.log
-
-# Очередь
-tail -f /var/www/digital-press/backend/storage/logs/worker.log
-
-# PHP-FPM
-sudo tail -f /var/log/php8.2-fpm.log
-```
-
-### Частые проблемы:
-
-| Проблема | Решение |
-|----------|---------|
-| 403 Forbidden | `sudo chown -R www-data:www-data storage` |
-| 500 Server Error | Проверить логи, права на `storage/` |
-| PDF не открывается | Проверить `storage:link`, права на файлы |
-| Миниатюры не показываются | `php artisan storage:link` |
-| OCR не работает | Проверить `tesseract --list-langs`, статус воркера |
-| Очередь не обрабатывает | `sudo supervisorctl restart digital-press-worker:*` |
-
-### Очистка кэша:
-
-```bash
-cd /var/www/digital-press/backend
-php artisan cache:clear
-php artisan config:clear
-php artisan view:clear
-php artisan route:clear
-```
-
-### Права доступа:
-
-```bash
-sudo chown -R www-data:www-data /var/www/digital-press/backend/storage
-sudo chown -R www-data:www-data /var/www/digital-press/backend/bootstrap/cache
-sudo chmod -R 775 /var/www/digital-press/backend/storage
-sudo chmod -R 775 /var/www/digital-press/backend/bootstrap/cache
-```
+4.  Сгенерируйте ключ и запустите миграции:
+    ```powershell
+    php artisan key:generate
+    php artisan migrate --force
+    php artisan storage:link
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+    ```
 
 ---
 
-## Быстрый старт (TL;DR)
+## 8. Сборка Frontend
 
-```bash
-# 1. Установить пакеты (см. раздел 2)
-# 2. Клонировать проект
-cd /var/www/digital-press/backend
+1.  Перейдите в корень проекта (где `package.json` от React):
+    ```powershell
+    cd C:\inetpub\digital_press
+    ```
+    *(Если ваш frontend в отдельной папке `frontend`, перейдите туда)*.
 
-# 3. Backend
-composer install --no-dev
-cp .env.example .env
-nano .env  # Настроить БД, OCR пути
-php artisan key:generate
-php artisan migrate --force
-php artisan db:seed --class=UserSeeder
-php artisan storage:link
-sudo chown -R www-data:www-data storage bootstrap/cache
-
-# 4. Frontend
-cd ../frontend
-npm install && npm run build
-
-# 5. Nginx
-sudo cp ../nginx/digital-press-production.conf /etc/nginx/sites-available/digital-press
-sudo ln -s /etc/nginx/sites-available/digital-press /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-
-# 6. Supervisor (очередь)
-# Создать /etc/supervisor/conf.d/digital-press-worker.conf
-sudo supervisorctl reread && sudo supervisorctl update
-
-# 7. SSL
-sudo certbot --nginx -d your-domain.kz
-
-# 8. Войти: admin / password — СМЕНИТЬ ПАРОЛЬ!
-```
+2.  Установите зависимости и соберите проект:
+    ```powershell
+    npm install
+    npm run build
+    ```
+3.  После сборки папка `dist` (или `build`) должна быть скопирована в `backend/public` или настроена в Nginx.
+    *   В текущей конфигурации Vite обычно собирает в `backend/public` или генерирует ассеты, которые Laravel подхватывает.
+    *   Если сборка идет в отдельную папку `dist`, скопируйте её содержимое в `backend/public` (но будьте осторожны, чтобы не стереть `index.php`).
 
 ---
 
-*Версия: 2.0 | Январь 2026*
+## 9. Настройка веб-сервера (Nginx)
+
+1.  Откройте конфиг `C:\nginx\conf\nginx.conf`.
+2.  В блоке `http {}` добавьте `include C:/inetpub/digital_press/nginx/digital-press-production.conf;` (или просто скопируйте содержимое конфига).
+3.  Отредактируйте `digital-press-production.conf`:
+    *   Исправьте пути `root` на абсолютные пути Windows, например: `C:/inetpub/digital_press/backend/public`.
+    *   Обратите внимание на слеши: в Nginx используйте прямые слеши `/` даже на Windows.
+4.  Проверьте конфиг:
+    ```powershell
+    C:\nginx\nginx.exe -t
+    ```
+5.  Запустите (или перезагрузите) Nginx:
+    ```powershell
+    start C:\nginx\nginx.exe
+    # Или для перезагрузки
+    C:\nginx\nginx.exe -s reload
+    ```
+
+---
+
+## 10. Настройка автозапуска служб (NSSM)
+
+Для того чтобы сайт работал после перезагрузки сервера, не запуская вручную консоли, используйте **NSSM** (Non-Sucking Service Manager).
+
+1.  Скачайте NSSM [nssm.cc](https://nssm.cc/download).
+2.  Распакуйте `win64/nssm.exe` в `C:\Windows\System32` (или в любую папку в PATH).
+
+### 10.1. Служба PHP-CGI (обработка запросов)
+
+```powershell
+nssm install digital-press-php
+```
+В открывшемся окне:
+*   **Path:** `C:\php\php-cgi.exe`
+*   **Startup directory:** `C:\php`
+*   **Arguments:** `-b 127.0.0.1:9000`
+*   Нажмите **Install service**.
+
+Запустите службу:
+```powershell
+nssm start digital-press-php
+```
+
+### 10.2. Служба Queue Worker (Сжатие и OCR)
+
+Это критически важная служба для фоновой обработки файлов.
+
+```powershell
+nssm install digital-press-worker
+```
+В открывшемся окне:
+*   **Path:** `C:\php\php.exe`
+*   **Startup directory:** `C:\inetpub\digital_press\backend`
+*   **Arguments:** `artisan queue:listen --tries=3 --timeout=600`
+*   Нажмите **Install service**.
+
+Запустите службу:
+```powershell
+nssm start digital-press-worker
+```
+
+### 10.3. Служба Nginx (если не установлен как служба)
+
+Если вы просто распаковали Nginx, он не запускается сам. Установите его как службу:
+
+```powershell
+nssm install digital-press-nginx
+```
+*   **Path:** `C:\nginx\nginx.exe`
+*   **Startup directory:** `C:\nginx`
+*   **Install service**.
+*   `nssm start digital-press-nginx`
+
+---
+
+## Проверка работоспособности
+
+1.  Зайдите на `http://localhost` (или IP сервера).
+2.  Попробуйте авторизоваться.
+3.  **Тест загрузки:** Загрузите PDF газету.
+4.  Проверьте `C:\inetpub\digital_press\backend\storage\logs\laravel.log` на наличие ошибок.
+5.  Убедитесь, что файл появился на сайте через некоторое время (когда служба digital-press-worker обработает его).
+
+---
+
+## Частые проблемы на Windows
+
+*   **Ошибка "File not found" при скачивании:**
+    *   Проверьте, что в `.env` стоит `FILESYSTEM_DISK=public`.
+    *   Проверьте, что выполнена команда `php artisan storage:link`.
+*   **Ошибка OCR/Ghostscript:**
+    *   Чаще всего дело в путях. Проверьте переменные `_PATH` в `.env`.
+    *   Убедитесь, что пользователь, от имени которого запущена служба (обычно System), имеет права на чтение/запись в папку `storage` и `C:\Windows\Temp`.
+*   **Долгая загрузка:**
+    *   Увеличьте `upload_max_filesize` и `post_max_size` в `php.ini`.
+    *   Увеличьте `client_max_body_size` в конфиге Nginx.

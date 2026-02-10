@@ -14,7 +14,10 @@ class File extends Model
     protected $fillable = [
         'original_name',
         'stored_path',
+        'original_path',
         'mime_type',
+        'status',
+        'error_message',
         'size',
         'sha256',
         'fileable_type',
@@ -57,7 +60,19 @@ class File extends Model
     public function getAccelRedirectPath(): string
     {
         // /_protected/ maps to storage/app/ in Nginx
-        return '/_protected/' . $this->stored_path;
+        // If using 'public' disk, we need to prepend 'public/' because alias is storage/app/
+        // If using 'local' disk, we need to prepend 'private/'
+        
+        $disk = config('filesystems.default');
+        $prefix = '';
+        
+        if ($disk === 'public') {
+            $prefix = 'public/';
+        } elseif ($disk === 'local') {
+            $prefix = 'private/';
+        }
+        
+        return '/_protected/' . $prefix . $this->stored_path;
     }
 
     /**
@@ -65,7 +80,8 @@ class File extends Model
      */
     public function getFullDiskPath(): string
     {
-        return storage_path('app/' . $this->stored_path);
+        // Use Storage facade to respect disk configuration
+        return \Illuminate\Support\Facades\Storage::path($this->stored_path);
     }
 
     /**

@@ -68,7 +68,7 @@ const resources = {
       "document.back_to_catalog": "Вернуться в каталог",
       "document.views": "Просмотров",
       "document.downloads": "Скачиваний",
-      "document.read_online": "Читать онлайн",
+      "document_read_online": "Читать онлайн",
       
       // Footer
       "footer.copyright": "Все права защищены",
@@ -78,6 +78,7 @@ const resources = {
       // Publication
       "publication.back_to_histories": "К списку историй",
       "publication.read_more": "Читать историю",
+
       // Admin
       "admin.dashboard": "Панель управления",
       "admin.documents": "Документы",
@@ -158,7 +159,7 @@ const resources = {
       "catalog.apply": "Қолдану",
       "catalog.reset": "Қалпына келтіру",
       "catalog.results": "нәтиже",
-      "catalog.noResults": "Басылымдар табылмады",
+      "catalog.noResults": "Газеттер табылмады",
       "catalog.view": "Қарау",
       "catalog.download": "Жүктеу",
       "catalog.issue": "Шығарылым",
@@ -189,7 +190,7 @@ const resources = {
       "document.back_to_catalog": "Каталогқа оралу",
       "document.views": "Қаралды",
       "document.downloads": "Жүктелді",
-      "document.read_online": "Онлайн оқу",
+      "document_read_online": "Онлайн оқу",
 
       // Footer
       "footer.copyright": "Барлық құқықтар қорғалған",
@@ -246,10 +247,11 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: "ru", 
+    lng: "ru",
     fallbackLng: "ru",
+    keySeparator: false, 
     interpolation: {
-      escapeValue: false 
+      escapeValue: false
     }
   });
 

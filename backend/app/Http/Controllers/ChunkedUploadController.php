@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Issue;
-use App\Jobs\ProcessOcrJob;
+use App\Models\File;
+use App\Jobs\CompressPdfJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Config;
 
 class ChunkedUploadController extends Controller
 {
@@ -134,16 +136,27 @@ class ChunkedUploadController extends Controller
 
         $tempDir = "uploads/temp/{$uploadId}";
         
-        // Determine final path
-        $year = date('Y', strtotime($request->issue_date));
-        $finalFilename = Str::uuid() . '.pdf';
-        $finalPath = "issues/{$year}/{$finalFilename}";
+        // Determine final path using NEW structure
+        $originalPathReq = Config::get('pdf.paths.original', 'pdf/original');
+        
+        // Ensure directory exists
+        if (!Storage::exists($originalPathReq)) {
+            Storage::makeDirectory($originalPathReq);
+        }
+
+        $uuid = Str::uuid();
+        $extension = 'pdf'; 
+        if (isset($metadata['filename'])) {
+            $ext = pathinfo($metadata['filename'], PATHINFO_EXTENSION);
+            if ($ext) $extension = $ext;
+        }
+
+        $originalStoredPath = $originalPathReq . '/' . $uuid . '.' . $extension;
         
         DB::beginTransaction();
         try {
             // Merge chunks into final file
-            $finalFullPath = Storage::path($finalPath);
-            Storage::makeDirectory("issues/{$year}");
+            $finalFullPath = Storage::path($originalStoredPath);
             
             $outputFile = fopen($finalFullPath, 'wb');
             
@@ -154,6 +167,22 @@ class ChunkedUploadController extends Controller
             }
             
             fclose($outputFile);
+
+            // Calculate stats
+            $sha256 = hash_file('sha256', $finalFullPath);
+            $size = filesize($finalFullPath);
+            
+            // Create File record
+            $file = File::create([
+                'original_name' => $metadata['filename'] ?? "upload_{$uploadId}.pdf",
+                'stored_path' => $originalStoredPath,
+                'original_path' => $originalStoredPath,
+                'status' => 'uploaded',
+                'mime_type' => 'application/pdf',
+                'size' => $size,
+                'sha256' => $sha256,
+                'uploaded_by' => $request->user()->id,
+            ]);
             
             // Create Issue record
             $issue = Issue::create([
@@ -161,11 +190,15 @@ class ChunkedUploadController extends Controller
                 'issue_date' => $request->issue_date,
                 'issue_number' => $request->issue_number,
                 'language' => $request->language,
-                'file_path' => $finalPath,
-                'file_size' => filesize($finalFullPath),
-                'mime_type' => 'application/pdf',
+                'file_path' => $file->stored_path, // Legacy
+                'file_id' => $file->id,
+                'file_size' => $file->size,
+                'mime_type' => $file->mime_type,
                 'created_by' => $request->user()->id,
             ]);
+
+            // Link file to issue
+            $file->update(['issue_id' => $issue->id]);
 
             // Init stats
             $issue->stats()->create([]);
@@ -173,8 +206,8 @@ class ChunkedUploadController extends Controller
             // Init OCR status
             $issue->ocrResult()->create(['status' => 'queued']);
             
-            // Dispatch OCR Job
-            ProcessOcrJob::dispatch($issue);
+            // Dispatch Compression Job
+            CompressPdfJob::dispatch($file);
 
             // Cleanup temp directory
             Storage::deleteDirectory($tempDir);
@@ -183,7 +216,7 @@ class ChunkedUploadController extends Controller
             DB::commit();
             
             return response()->json([
-                'message' => 'Upload complete',
+                'message' => 'Upload complete. Processing started (Compression -> OCR).',
                 'issue' => $issue,
             ], 201);
 
@@ -191,13 +224,12 @@ class ChunkedUploadController extends Controller
             DB::rollBack();
             // Cleanup on failure
             Storage::deleteDirectory($tempDir);
-            if (Storage::exists($finalPath)) {
-                Storage::delete($finalPath);
+            if (isset($originalStoredPath) && Storage::exists($originalStoredPath)) {
+                Storage::delete($originalStoredPath);
             }
             cache()->forget("upload_{$uploadId}");
             \Log::error('Chunked Upload Failed: ' . $e->getMessage());
             \Log::error($e->getTraceAsString());
-            
             
             return response()->json(['message' => 'Upload failed: ' . $e->getMessage()], 500);
         }
