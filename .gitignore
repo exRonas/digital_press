@@ -1,0 +1,68 @@
+# General
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# IDEs
+.idea/
+*.suo
+*.ntvs
+*.njsproj
+*.sln
+
+# Node / NPM
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-lock.yaml
+package-lock.json
+
+# Frontend (Vite/React)
+frontend/dist/
+frontend/.env
+frontend/.env.*.local
+frontend/node_modules/
+
+# Backend (Laravel)
+backend/vendor/
+backend/node_modules/
+backend/public/hot
+backend/public/storage
+backend/storage/*.key
+backend/.env
+backend/.env.backup
+backend/.env.phpunit
+backend/.phpunit.result.cache
+backend/homestead.json
+backend/homestead.yaml
+backend/auth.json
+
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/framework/testing/*
+backend/storage/logs/*
+
+!backend/storage/app/public/.gitignore
+!backend/storage/framework/cache/data/.gitignore
+!backend/storage/framework/sessions/.gitignore
+!backend/storage/framework/views/.gitignore
+!backend/storage/framework/testing/.gitignore
+!backend/storage/logs/.gitignore
+
+# Design (Next.js)
+design-v0/.next/
+design-v0/out/
+design-v0/build/
+design-v0/node_modules/
+design-v0/.env
+design-v0/.env.local
+design-v0/.vercel/
