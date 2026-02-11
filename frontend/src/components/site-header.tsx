@@ -13,9 +13,9 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-3">
-          <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain" />
+          <img src="/logo.png" alt="Logo" className="h-16 w-auto object-contain" />
           <div className="hidden sm:block">
-            <h1 className="font-serif text-lg font-semibold leading-tight text-foreground">
+            <h1 className="font-serif text-2xl font-semibold leading-tight text-foreground">
               {t("site.subtitle")}
             </h1>
           </div>

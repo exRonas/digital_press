@@ -109,7 +109,9 @@ export default function DocumentPage() {
           day: "numeric",
         });
 
-    const title = issue.publication.title_ru; // TODO: handle language switcher for title
+    const title = language === "kz" && issue.publication.title_kz 
+        ? issue.publication.title_kz 
+        : issue.publication.title_ru;
     
     const viewUrl = `/api/issues/${issue.id}/view`;
     const downloadUrl = `/api/issues/${issue.id}/download`;

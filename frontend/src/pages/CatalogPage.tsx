@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sheet"
 import { NewspaperCard } from "@/components/newspaper-card"
 import { useTranslation } from "react-i18next";
+import { useAccessibility } from "@/components/accessibility-provider"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import axios from "axios"
@@ -79,6 +80,7 @@ const SidebarFilters = ({
     setSelectedMonth,
     setPage
 }: SidebarFiltersProps) => {
+    const { language } = useAccessibility();
     
     const handleFilterChange = (setter: (val: string) => void, value: string) => {
         setter(value);
@@ -110,7 +112,7 @@ const SidebarFilters = ({
                         <SelectItem value="all">{t("filter.allNewspapers", {defaultValue: "Все издания"})}</SelectItem>
                         {publications.map((news) => (
                              <SelectItem key={news.id} value={news.id.toString()}>
-                                {news.title_ru}
+                                {language === 'kz' && news.title_kz ? news.title_kz : news.title_ru}
                              </SelectItem>
                         ))}
                     </SelectContent>
@@ -183,7 +185,7 @@ const SidebarFilters = ({
 };
 
 export default function CatalogPage() {
-    const { t } = useTranslation();
+    const { t, language } = useAccessibility();
     const [searchParams] = useSearchParams();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
     
@@ -381,7 +383,11 @@ export default function CatalogPage() {
                                             <NewspaperCard 
                                                 key={issue.id}
                                                 id={issue.id.toString()}
-                                                title={issue.publication?.title_ru || 'Unknown'}
+                                                title={
+                                                    (language === 'kz' && issue.publication?.title_kz) 
+                                                        ? issue.publication.title_kz 
+                                                        : (issue.publication?.title_ru || 'Unknown')
+                                                }
                                                 date={issue.issue_date}
                                                 issueNumber={parseInt(issue.issue_number) || 0}
                                                 language={issue.language}

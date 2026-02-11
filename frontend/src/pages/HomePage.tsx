@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,7 @@ import { NewspaperCard } from "@/components/newspaper-card"
 import axios from "axios"
 
 export function HomePage() {
-  const { t } = useAccessibility()
+  const { t, language } = useAccessibility()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -23,7 +23,7 @@ export function HomePage() {
             // Transform server data to component props matches
             const mapped = res.data.data.map((issue: any) => ({
                 id: issue.id,
-                title: issue.publication.title_ru,
+                title: language === 'kz' && issue.publication.title_kz ? issue.publication.title_kz : issue.publication.title_ru,
                 date: issue.issue_date,
                 number: issue.issue_number,
                 language: issue.language,
@@ -32,7 +32,7 @@ export function HomePage() {
             setRecentIssues(mapped);
         })
         .catch(err => console.error(err));
-  }, [])
+  }, [language]) // Added language dependency so it re-maps/re-fetches on language change
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,8 +45,13 @@ export function HomePage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="border-b border-border bg-muted/30 py-12 sm:py-16 lg:py-20">
-          <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+        <section className="relative border-b border-border bg-muted/30 py-12 sm:py-16 lg:py-20 overflow-hidden">
+          {/* Background Image */}
+          <div className="absolute inset-0 z-0 pointer-events-none opacity-20 blur-[2px]">
+            <img src="/back.jpeg" alt="" className="h-full w-full object-cover" />
+          </div>
+
+          <div className="relative z-10 mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
             <h1 className="mb-4 font-serif text-4xl font-bold leading-tight text-foreground sm:text-5xl lg:text-6xl text-balance">
               {t("hero.title")}
             </h1>
@@ -73,9 +78,17 @@ export function HomePage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-8">
                 <h2 className="text-2xl font-bold font-serif">{t("recent.title") || "Свежие выпуски"}</h2>
-                <Button variant="ghost" onClick={() => navigate('/catalog')}>
-                    {t("recent.viewAll") || "Смотреть все"}
-                </Button>
+                <div className="flex items-center gap-4">
+                  <Link 
+                    to="/histories" 
+                    className="text-sm font-medium text-foreground hover:text-primary transition-colors hover:underline underline-offset-4"
+                  >
+                    {t("footer.histories") || "История изданий"}
+                  </Link>
+                  <Button variant="outline" onClick={() => navigate('/catalog')}>
+                      {t("recent.viewAll") || "Смотреть все"}
+                  </Button>
+                </div>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

@@ -45,7 +45,7 @@ const RENDER_SCALE = window.devicePixelRatio >= 2 ? 2 : 2; // Always render at 2
 
 // Zoom limits - mobile devices need more zoom due to smaller screens
 const MIN_SCALE = 0.5;
-const MAX_SCALE = window.innerWidth < 768 ? 5 : 3; // 500% on mobile, 300% on desktop
+const MAX_SCALE = 5; // Unified max scale: 500% for all devices
 const ZOOM_STEP = 0.25;
 
 // Memory optimization: limit cached pages to reduce RAM usage
@@ -75,6 +75,10 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
     // Refs
     const containerRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<HTMLDivElement>(null);
+    
+    // Drag-to-scroll / swipe state
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0, time: 0 });
 
     // Update cached pages list - add neighbors one by one after current page loads
     useEffect(() => {
@@ -129,22 +133,19 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
         const updateWidth = () => {
             if (viewerRef.current) {
                 const containerWidth = viewerRef.current.clientWidth;
-                const containerHeight = viewerRef.current.clientHeight;
                 // Use 90% of container width, max 1200px
                 const optimalWidth = Math.min(containerWidth * 0.9, 1200);
-                // For rotated pages, adjust
-                if (rotation === 90 || rotation === 270) {
-                    setPageWidth(Math.min(containerHeight * 0.85, optimalWidth));
-                } else {
-                    setPageWidth(optimalWidth);
-                }
+                
+                // FIXED: Do not change pageWidth based on rotation to prevent re-rendering!
+                // We will handle visual scaling via CSS transform in the cleanup below
+                setPageWidth(optimalWidth);
             }
         };
         
         updateWidth();
         window.addEventListener("resize", updateWidth);
         return () => window.removeEventListener("resize", updateWidth);
-    }, [rotation]);
+    }, []); // Removed rotation dependency!
 
     // Keyboard navigation
     useEffect(() => {
@@ -251,6 +252,55 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
         document.addEventListener("fullscreenchange", handleFullscreenChange);
         return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
     }, []);
+
+    // Drag-to-scroll and swipe-to-navigate handlers
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (e.button !== 0) return;
+        const viewer = viewerRef.current;
+        if (!viewer) return;
+        setIsDragging(true);
+        dragStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            scrollLeft: viewer.scrollLeft,
+            scrollTop: viewer.scrollTop,
+            time: Date.now(),
+        };
+        e.preventDefault();
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!isDragging) return;
+        const viewer = viewerRef.current;
+        if (!viewer) return;
+        const dx = e.clientX - dragStartRef.current.x;
+        const dy = e.clientY - dragStartRef.current.y;
+        viewer.scrollLeft = dragStartRef.current.scrollLeft - dx;
+        viewer.scrollTop = dragStartRef.current.scrollTop - dy;
+    };
+
+    const handlePointerUp = (e: React.PointerEvent) => {
+        if (!isDragging) return;
+        setIsDragging(false);
+        /* 
+        // DISABLED: Swipe navigation (auto-switch page on edge drag)
+        const dx = e.clientX - dragStartRef.current.x;
+        const elapsed = Date.now() - dragStartRef.current.time;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(e.clientY - dragStartRef.current.y);
+        // Swipe to change pages: horizontal drag > 60px, mostly horizontal, fast
+        if (absDx > 60 && absDx > absDy * 1.5 && elapsed < 500) {
+            if (dx < 0) goToNextPage();
+            else goToPrevPage();
+        }
+        */
+    };
+
+    // Rotation helpers — CSS-based, no re-render
+    const isRotated = rotation === 90 || rotation === 270;
+    const pageAspect = 1.414;
+    const displayW = (isRotated ? pageWidth * pageAspect : pageWidth) * scale;
+    const displayH = (isRotated ? pageWidth : pageWidth * pageAspect) * scale;
 
     return (
         <div
@@ -372,7 +422,12 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
             {/* Main Viewer Area - container for PDF */}
             <div
                 ref={viewerRef}
-                className="flex-1 overflow-auto bg-neutral-900"
+                className="flex-1 overflow-auto bg-neutral-900 select-none"
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
             >
                 {/* Loading State - shown as overlay while PDF loads */}
                 {isLoading && (
@@ -403,8 +458,8 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
                         style={{
                             // When zoomed, this container expands to fit the zoomed content
                             // allowing proper scrolling in all directions
-                            width: scale > 1 ? `max(100%, ${pageWidth * scale + 32}px)` : '100%',
-                            minHeight: scale > 1 ? `max(100%, ${pageWidth * 1.414 * scale + 32}px)` : '100%',
+                            width: scale > 1 ? `max(100%, ${displayW + 32}px)` : '100%',
+                            minHeight: scale > 1 ? `max(100%, ${displayH + 32}px)` : '100%',
                         }}
                     >
                         <Document
@@ -420,8 +475,8 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
                                     <div 
                                         className="absolute flex items-center justify-center bg-neutral-800 z-10 rounded-lg"
                                         style={{ 
-                                            width: pageWidth * scale, 
-                                            height: pageWidth * 1.414 * scale,
+                                            width: displayW, 
+                                            height: displayH,
                                             top: 0,
                                             left: 0 
                                         }}
@@ -429,7 +484,7 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
                                         {/* Skeleton loader */}
                                         <div 
                                             className="relative overflow-hidden bg-neutral-700 rounded"
-                                            style={{ width: pageWidth * scale, height: pageWidth * 1.414 * scale }}
+                                            style={{ width: displayW, height: displayH }}
                                         >
                                             {/* Shimmer effect */}
                                             <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-neutral-600/50 to-transparent" />
@@ -452,22 +507,27 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
                                             style={{ 
                                                 // Only show current page, hide others (but keep in DOM!)
                                                 display: isCurrent ? 'block' : 'none',
-                                                width: pageWidth * scale,
-                                                height: pageWidth * 1.414 * scale,
+                                                width: displayW,
+                                                height: displayH,
                                                 overflow: 'hidden',
+                                                position: 'relative',
                                             }}
                                         >
+                                            {/* CSS rotation — no canvas re-render, no white flash */}
                                             <div
                                                 style={{ 
-                                                    transform: `scale(${scale / RENDER_SCALE})`,
-                                                    transformOrigin: 'top left',
-                                                    transition: isCurrent ? 'transform 0.15s ease-out' : 'none',
+                                                    position: 'absolute',
+                                                    top: '50%',
+                                                    left: '50%',
+                                                    transform: `translate(-50%, -50%) scale(${scale / RENDER_SCALE}) rotate(${rotation}deg)`,
+                                                    transformOrigin: 'center center',
+                                                    transition: isCurrent ? 'transform 0.2s ease-out' : 'none',
                                                 }}
                                             >
                                                 <Page
                                                     pageNumber={pageNum}
                                                     width={pageWidth * RENDER_SCALE}
-                                                    rotate={rotation}
+                                                    rotate={0}
                                                     onLoadSuccess={isCurrent ? onPageLoadSuccess : undefined}
                                                     onRenderSuccess={() => {
                                                         if (isCurrent) {
@@ -529,7 +589,7 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
                 >
                     <ZoomOut className="h-5 w-5" />
                 </Button>
-                <span className="text-sm text-neutral-400 w-12 text-center">{Math.round(scale * 100)}%</span>
+                <div onClick={resetZoom} className="text-sm text-neutral-400 w-12 text-center cursor-pointer">{Math.round(scale * 100)}%</div>
                 <Button
                     variant="ghost"
                     size="icon"
@@ -538,6 +598,15 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
                     disabled={scale >= MAX_SCALE}
                 >
                     <ZoomIn className="h-5 w-5" />
+                </Button>
+                <div className="w-px h-6 bg-neutral-600 mx-1" />
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 text-neutral-300 hover:text-white"
+                    onClick={rotate}
+                >
+                    <RotateCw className="h-5 w-5" />
                 </Button>
             </div>
         </div>

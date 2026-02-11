@@ -204,7 +204,7 @@ class IssueController extends Controller
             
             // Check if running behind Nginx (X-Accel-Redirect support)
             // Or force it via config/env if detection fails
-            if (true) {
+            if (false) {
                 return response('', 200, [
                     'X-Accel-Redirect' => $issue->file->getAccelRedirectPath(),
                     'Content-Type' => $issue->file->mime_type,

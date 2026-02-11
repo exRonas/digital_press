@@ -71,3 +71,5 @@ design-v0/node_modules/
 design-v0/.env
 design-v0/.env.local
 design-v0/.vercel/
+
+todoNow.txt

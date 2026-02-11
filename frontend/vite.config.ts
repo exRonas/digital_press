@@ -13,16 +13,15 @@ export default defineConfig({
   server: {
     allowedHosts: true,
     proxy: {
-      // API proxy - now pointing to Nginx (port 80) instead of php artisan serve (8000)
-      // Nginx handles PHP-FPM and X-Accel-Redirect for PDFs
+      // API proxy - now pointing to php artisan serve (8000)
       '/api': {
-        target: 'http://localhost:80',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
       // Storage proxy for thumbnails and other public files
       '/storage': {
-        target: 'http://localhost:80',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },

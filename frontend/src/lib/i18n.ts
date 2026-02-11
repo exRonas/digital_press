@@ -7,7 +7,7 @@ const resources = {
     translation: {
       // Header
       "site.title": "Цифровой банк печати",
-      "site.subtitle": "Toraigyrov Kitaphanasy",
+      "site.subtitle": "Toraigyrov kitaphanasy",
       "accessibility": "Доступность",
       
       // Home
@@ -72,7 +72,7 @@ const resources = {
       
       // Footer
       "footer.copyright": "Все права защищены",
-      "footer.library": "Toraigyrov Kitaphanasy",
+      "footer.library": "Toraigyrov kitaphanasy",
       "footer.histories": "История изданий",
       
       // Publication
@@ -127,7 +127,7 @@ const resources = {
     translation: {
       // Header
       "site.title": "Цифрлық баспа банкі",
-      "site.subtitle": "Toraigyrov Kitaphanasy",
+      "site.subtitle": "Toraigyrov kitaphanasy",
       "accessibility": "Қолжетімділік",
       
       // Home
@@ -194,7 +194,7 @@ const resources = {
 
       // Footer
       "footer.copyright": "Барлық құқықтар қорғалған",
-      "footer.library": "Toraigyrov Kitaphanasy",
+      "footer.library": "Toraigyrov kitaphanasy",
       "footer.histories": "Басылымдар тарихы",
 
       // Admin
