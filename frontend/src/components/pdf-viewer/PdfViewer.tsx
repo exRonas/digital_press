@@ -279,7 +279,7 @@ export function PdfViewer({ fileUrl, onClose, title }: PdfViewerProps) {
         viewer.scrollTop = dragStartRef.current.scrollTop - dy;
     };
 
-    const handlePointerUp = (e: React.PointerEvent) => {
+    const handlePointerUp = () => {
         if (!isDragging) return;
         setIsDragging(false);
         /* 

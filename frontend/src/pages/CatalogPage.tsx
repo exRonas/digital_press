@@ -20,7 +20,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { NewspaperCard } from "@/components/newspaper-card"
-import { useTranslation } from "react-i18next";
 import { useAccessibility } from "@/components/accessibility-provider"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -276,7 +275,7 @@ export default function CatalogPage() {
                      <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                         <div>
                              <h1 className="font-serif text-3xl font-bold text-foreground">
-                                {t("catalog.title", {defaultValue: "Каталог изданий"})}
+                                {t("catalog.title")}
                             </h1>
                             <p className="mt-1 text-muted-foreground">
                                 {t("catalog.subtitle")}
@@ -292,7 +291,7 @@ export default function CatalogPage() {
                                   onClick={() => setViewMode("grid")}
                                 >
                                   <Grid3X3 className="h-4 w-4" />
-                                  <span className="sr-only">{t("catalog.view_grid", {defaultValue: "Сетка"})}</span>
+                                  <span className="sr-only">{t("catalog.view_grid")}</span>
                                 </Button>
                                 <Button
                                   variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -301,7 +300,7 @@ export default function CatalogPage() {
                                   onClick={() => setViewMode("list")}
                                 >
                                   <List className="h-4 w-4" />
-                                  <span className="sr-only">{t("catalog.view_list", {defaultValue: "Список"})}</span>
+                                  <span className="sr-only">{t("catalog.view_list")}</span>
                                 </Button>
                             </div>
 
@@ -309,13 +308,13 @@ export default function CatalogPage() {
                                 <SheetTrigger asChild>
                                   <Button variant="outline" size="sm" className="gap-2 lg:hidden">
                                     <Filter className="h-4 w-4" />
-                                    {t("catalog.filters", {defaultValue: "Фильтры"})}
+                                    {t("catalog.filters")}
                                   </Button>
                                 </SheetTrigger>
                                 <SheetContent side="left" className="w-[85vw] max-w-[400px] overflow-y-auto">
                                   <SheetHeader>
                                     <SheetTitle className="font-serif">
-                                        {t("catalog.filters", {defaultValue: "Фильтры"})}
+                                        {t("catalog.filters")}
                                     </SheetTitle>
                                   </SheetHeader>
                                   <div className="mt-4">
@@ -364,7 +363,7 @@ export default function CatalogPage() {
                         <div className="lg:col-span-3">
                             <div className="flex justify-end mb-4">
                                 <span className="text-sm text-muted-foreground">
-                                    {meta ? `${t('catalog.showing', {defaultValue: "Показано"})} ${issues.length} ${t('catalog.of', {defaultValue: "из"})} ${meta.total}` : ''}
+                                    {meta ? `${t('catalog.showing')} ${issues.length} ${t('catalog.of')} ${meta.total}` : ''}
                                 </span>
                             </div>
 
@@ -399,10 +398,10 @@ export default function CatalogPage() {
                                     {issues.length === 0 && (
                                         <div className="flex h-64 flex-col items-center justify-center rounded-lg border border-dashed text-center">
                                             <h3 className="font-serif text-lg font-medium">
-                                                {t("catalog.noResults", {defaultValue: "Ничего не найдено"})}
+                                                {t("catalog.noResults")}
                                             </h3>
                                             <p className="text-sm text-muted-foreground">
-                                                {t("catalog.try_changing_filters", {defaultValue: "Попробуйте изменить параметры поиска"})}
+                                                {t("catalog.try_changing_filters")}
                                             </p>
                                         </div>
                                     )}

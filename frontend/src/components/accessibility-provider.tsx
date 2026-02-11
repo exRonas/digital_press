@@ -65,6 +65,7 @@ const translations: Record<Language, Record<string, string>> = {
     "catalog.view": "Просмотр",
     "catalog.download": "Скачать",
     "catalog.issue": "Выпуск",
+    "catalog.try_changing_filters": "Попробуйте изменить параметры поиска",
     "publication.history": "История издания",
     // Document
     "document.breadcrumb.home": "Главная",
@@ -166,6 +167,7 @@ const translations: Record<Language, Record<string, string>> = {
     "catalog.view": "Қарау",
     "catalog.download": "Жүктеу",
     "catalog.issue": "Шығарылым",
+    "catalog.try_changing_filters": "Іздеу параметрлерін өзгертіп көріңіз",
     "publication.history": "Басылым тарихы",
     // Document
     "document.breadcrumb.home": "Басты бет",
