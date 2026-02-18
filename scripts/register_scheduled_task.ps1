@@ -20,7 +20,8 @@ param(
 
 $TaskName    = "DigitalPress_AutoImport"
 $ScriptPath  = Join-Path $PSScriptRoot "auto_import.ps1"
-$PhpExe      = (Get-Command php -ErrorAction SilentlyContinue)?.Source
+$PhpCmd = Get-Command php -ErrorAction SilentlyContinue
+$PhpExe = if ($PhpCmd) { $PhpCmd.Source } else { $null }
 
 # Проверяем наличие php в PATH
 if (-not $PhpExe) {
