@@ -18,7 +18,7 @@ class ImportIssues extends Command
      *
      * @var string
      */
-    protected $signature = 'import:issues {path : Full path to the directory containing PDFs} {--dry-run : Simulate without saving}';
+    protected $signature = 'import:issues {path : Full path to the directory containing PDFs} {--dry-run : Simulate without saving} {--force : Overwrite files that already exist in storage}';
 
     /**
      * The console command description.
@@ -34,6 +34,7 @@ class ImportIssues extends Command
     {
         $path = $this->argument('path');
         $dryRun = $this->option('dry-run');
+        $force  = $this->option('force');
 
         if (!File::isDirectory($path)) {
             $this->error("Directory not found: $path");
@@ -87,12 +88,14 @@ class ImportIssues extends Command
                 $newFilename = Str::slug($publication->title_ru) . "_" . $date . "_" . $number . ".pdf";
                 $targetPath = $storageDir . "/" . $newFilename;
 
-                if (!Storage::disk('public')->exists($targetPath)) {
+                if (!Storage::disk('public')->exists($targetPath) || $force) {
+                    if ($force && Storage::disk('public')->exists($targetPath)) {
+                        $this->warn("File exists in storage but --force used, overwriting.");
+                    }
                     // Copy file using streams (better memory usage)
                     File::ensureDirectoryExists(Storage::disk('public')->path(dirname($targetPath)));
                     File::copy($file->getRealPath(), Storage::disk('public')->path($targetPath));
-                    
-                    // Create DB Record
+
                     $issue = Issue::create([
                         'publication_id' => $publication->id,
                         'issue_date' => $date,

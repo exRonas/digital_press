@@ -73,7 +73,7 @@ Write-Log "Lock file created."
 try {
     # 4. Run import
     Write-Log "Running import:issues..."
-    $importOutput = & php artisan import:issues "$ImportPath" 2>&1
+    $importOutput = & php artisan import:issues "$ImportPath" --force 2>&1
     $importOutput | ForEach-Object { Write-Log "  [import] $_" }
 
     if ($LASTEXITCODE -ne 0) {
