@@ -1,12 +1,11 @@
 "use client"
 
 import { Link } from "react-router-dom"
-import { Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAccessibility } from "@/components/accessibility-provider"
 
 export function SiteHeader() {
-  const { highContrast, toggleHighContrast, language, setLanguage, t } =
+  const { language, setLanguage, t } =
     useAccessibility()
 
   return (
@@ -48,17 +47,8 @@ export function SiteHeader() {
             </button>
           </div>
 
-          {/* Accessibility Toggle */}
-          <Button
-            variant={highContrast ? "default" : "outline"}
-            size="sm"
-            onClick={toggleHighContrast}
-            className="gap-2"
-            aria-label={t("accessibility")}
-          >
-            <Eye className="h-4 w-4" />
-            <span className="sr-only sm:not-sr-only">{t("accessibility")}</span>
-          </Button>
+
+          {/* Accessibility Toggle - Removed */}
         </div>
       </div>
     </header>

@@ -18,7 +18,7 @@ export function HomePage() {
   const [recentIssues, setRecentIssues] = useState<any[]>([])
 
   useEffect(() => {
-     axios.get('/issues?sort=date_desc&limit=6')
+     axios.get('/issues?sort=created_desc&limit=4')
         .then(res => {
             // Transform server data to component props matches
             const mapped = res.data.data.map((issue: any) => ({

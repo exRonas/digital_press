@@ -15,6 +15,8 @@ class StatisticsController extends Controller
     {
         // 1. General Stats
         $totalDocuments = Issue::count();
+        $countRu = Issue::where('language', 'ru')->count();
+        $countKz = Issue::where('language', 'kz')->count();
         
         // Count new issues this month
         $newIssues = Issue::whereMonth('created_at', Carbon::now()->month)
@@ -89,6 +91,16 @@ class StatisticsController extends Controller
                     'title' => 'Всего документов',
                     'value' => number_format($totalDocuments),
                     // 'change' => '+12%', // Hard to calc without history table
+                    'icon' => 'FileText',
+                ],
+                [
+                    'title' => 'Казахских изданий',
+                    'value' => number_format($countKz),
+                    'icon' => 'FileText',
+                ],
+                [
+                    'title' => 'Русских изданий',
+                    'value' => number_format($countRu),
                     'icon' => 'FileText',
                 ],
                 [

@@ -76,6 +76,11 @@ class IssueController extends Controller
         }
         
         // Sorting
+        if ($request->has('limit')) {
+            $query->orderBy('created_at', 'desc')->limit($request->limit);
+            return response()->json(['data' => $query->get()]);
+        }
+
         $sort = $request->input('sort', 'date_desc');
         switch ($sort) {
             case 'date_asc':
