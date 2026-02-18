@@ -89,7 +89,7 @@ class ProcessOcrJob implements ShouldQueue
             $this->generateThumbnail($pdfPath);
 
             $tesseractPath = env('TESSERACT_PATH', 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe');
-            $ocrLang = env('OCR_LANG', 'eng');
+            $ocrLang = env('OCR_LANG', 'rus');
             
             Log::info("[OCR] Tesseract path: {$tesseractPath}");
             Log::info("[OCR] Tesseract exists: " . (file_exists($tesseractPath) ? 'YES' : 'NO'));
