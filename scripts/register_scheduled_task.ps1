@@ -47,9 +47,7 @@ $Trigger = New-ScheduledTaskTrigger -Daily -At "$($Hour):00"
 $Settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Hours 6) `
     -MultipleInstances IgnoreNew `
-    -RunOnlyIfNetworkAvailable $false `
-    -StartWhenAvailable `
-    -WakeToRun $false
+    -StartWhenAvailable
 
 # Регистрируем задачу (от имени SYSTEM, чтобы не нужна была открытая сессия)
 Register-ScheduledTask `
