@@ -88,6 +88,10 @@ class ProcessOcrJob implements ShouldQueue
             Log::info("[OCR] Generating thumbnail...");
             $this->generateThumbnail($pdfPath);
 
+            // 2.2 Compress PDF with Ghostscript
+            Log::info("[OCR] Compressing PDF...");
+            $this->compressPdf($pdfPath);
+
             $tesseractPath = env('TESSERACT_PATH', 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe');
             $ocrLang = env('OCR_LANG', 'rus');
             
@@ -203,6 +207,82 @@ class ProcessOcrJob implements ShouldQueue
         } catch (\Throwable $e) {
             // Log error but don't fail the job - thumbnail is not critical
             Log::warning("[OCR] Failed to generate thumbnail for issue #{$this->issue->id}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Compress PDF in-place using Ghostscript.
+     * Replaces the original file with a smaller version.
+     */
+    protected function compressPdf(string $pdfPath): void
+    {
+        try {
+            $enabled = config('pdf.compression.enabled', true);
+            if (!$enabled) {
+                Log::info("[OCR] PDF compression disabled, skipping.");
+                return;
+            }
+
+            $gsPath  = config('pdf.compression.ghostscript_path', 'gs');
+            $profile = config('pdf.compression.profile', 'ebook');
+            $timeout = config('pdf.compression.timeout', 300);
+            $gray    = config('pdf.compression.grayscale', false);
+
+            $tempOutput = $pdfPath . '.compressed.pdf';
+
+            $command = [
+                $gsPath,
+                '-sDEVICE=pdfwrite',
+                '-dCompatibilityLevel=1.4',
+                "-dPDFSETTINGS=/{$profile}",
+                '-dNOPAUSE',
+                '-dQUIET',
+                '-dBATCH',
+                "-sOutputFile={$tempOutput}",
+            ];
+
+            if ($gray) {
+                $command[] = '-sColorConversionStrategy=Gray';
+                $command[] = '-dProcessColorModel=/DeviceGray';
+            }
+
+            $command[] = $pdfPath;
+
+            $originalSize = filesize($pdfPath);
+            Log::info("[OCR] Compressing PDF. Original size: {$originalSize} bytes. Profile: {$profile}");
+
+            $process = new Process($command);
+            $process->setTimeout($timeout);
+            $process->run();
+
+            if (!$process->isSuccessful()) {
+                Log::warning("[OCR] Ghostscript failed, keeping original: " . $process->getErrorOutput());
+                if (file_exists($tempOutput)) unlink($tempOutput);
+                return;
+            }
+
+            if (!file_exists($tempOutput) || filesize($tempOutput) === 0) {
+                Log::warning("[OCR] Ghostscript produced empty file, keeping original.");
+                if (file_exists($tempOutput)) unlink($tempOutput);
+                return;
+            }
+
+            $newSize = filesize($tempOutput);
+
+            // Only replace if actually smaller
+            if ($newSize < $originalSize) {
+                rename($tempOutput, $pdfPath);
+                $this->issue->update(['file_size' => $newSize]);
+                $saved = round(($originalSize - $newSize) / 1024 / 1024, 2);
+                Log::info("[OCR] Compression done. {$originalSize} -> {$newSize} bytes (saved {$saved} MB)");
+            } else {
+                Log::info("[OCR] Compressed file not smaller ({$newSize} >= {$originalSize}), keeping original.");
+                unlink($tempOutput);
+            }
+
+        } catch (\Throwable $e) {
+            Log::warning("[OCR] Compression failed (non-critical): " . $e->getMessage());
+            // Compression failure is non-critical — OCR continues
         }
     }
 }

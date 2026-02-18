@@ -4,6 +4,9 @@ Thumbs.db
 *.log
 *.tmp
 
+# Scripts runtime files
+scripts/auto_import.lock
+
 # VS Code
 .vscode/*
 !.vscode/extensions.json
