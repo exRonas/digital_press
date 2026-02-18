@@ -10,6 +10,8 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->call(PublicationSeeder::class);
+
         // Default Admin
         User::create([
             'name' => 'Администратор',
