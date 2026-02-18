@@ -25,6 +25,11 @@ $LogFile    = Join-Path $PSScriptRoot "..\backend\storage\logs\auto_import.log"
 $MaxWaitOcrMinutes = 120   # Максимальное время ожидания обработки OCR (мин)
 # ─────────────────────────────────────────────────────────────
 
+# Убеждаемся что директория логов существует
+if (-not (Test-Path (Split-Path $LogFile))) {
+    New-Item -ItemType Directory -Path (Split-Path $LogFile) -Force | Out-Null
+}
+
 function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"

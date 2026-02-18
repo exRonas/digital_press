@@ -49,13 +49,15 @@ $Settings = New-ScheduledTaskSettingsSet `
     -MultipleInstances IgnoreNew `
     -StartWhenAvailable
 
-# Регистрируем задачу (от имени SYSTEM, чтобы не нужна была открытая сессия)
+# Регистрируем задачу от имени текущего пользователя
+$CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 Register-ScheduledTask `
     -TaskName $TaskName `
     -Action $Action `
     -Trigger $Trigger `
     -Settings $Settings `
     -RunLevel Highest `
+    -User $CurrentUser `
     -Force | Out-Null
 
 Write-Host ""
