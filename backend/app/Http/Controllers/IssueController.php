@@ -150,6 +150,7 @@ class IssueController extends Controller
         $sessionKey = 'viewed_issue_' . $id;
 
         if (!$request->session()->has($sessionKey)) {
+            $issue->stats()->firstOrCreate(['issue_id' => $issue->id]);
             $issue->stats()->increment('views_count', 1, ['last_viewed_at' => now()]);
             $request->session()->put($sessionKey, true);
         }
@@ -163,6 +164,7 @@ class IssueController extends Controller
         
         // Use new File system if available
         if ($issue->file) {
+            $issue->stats()->firstOrCreate(['issue_id' => $issue->id]);
             $issue->stats()->increment('downloads_count', 1, ['last_downloaded_at' => now()]);
             
             // Check if running behind Nginx (X-Accel-Redirect support)
@@ -186,14 +188,31 @@ class IssueController extends Controller
             );
         }
         
-        // Legacy fallback - direct Laravel file serving
-        if (!Storage::exists($issue->file_path)) {
+        // Legacy fallback - direct Laravel file serving (public disk)
+        if (!Storage::disk('public')->exists($issue->file_path)) {
             return response()->json(['message' => 'File not found on disk'], 404);
         }
 
+        $issue->stats()->firstOrCreate(['issue_id' => $issue->id]);
         $issue->stats()->increment('downloads_count', 1, ['last_downloaded_at' => now()]);
-        
-        return Storage::download($issue->file_path, "issue_{$issue->id}.pdf");
+
+        $physicalPath = storage_path('app/public/' . $issue->file_path);
+
+        if ($this->isNginx()) {
+            return response('', 200, [
+                'X-Accel-Redirect' => '/_protected/public/' . $issue->file_path,
+                'X-Accel-Buffering' => 'no',
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="issue_' . $issue->id . '.pdf"',
+                'Content-Length' => filesize($physicalPath),
+                'Cache-Control' => 'private, no-store',
+            ]);
+        }
+
+        return response()->file($physicalPath, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="issue_' . $issue->id . '.pdf"',
+        ]);
     }
 
     public function view(Request $request, $id)
@@ -239,29 +258,31 @@ class IssueController extends Controller
             return response()->json(['message' => 'File not found on disk'], 404);
         }
 
-        // Legacy fallback - serve via X-Accel-Redirect from public storage
-        // physical path: storage/app/public/{$issue->file_path}
-        // Nginx location /_protected/ alias storage/app/
-        $accelPath = '/_protected/public/' . $issue->file_path;
-        
         $physicalPath = storage_path('app/public/' . $issue->file_path);
-        \Log::channel('single')->info("PDF Debug: Preparing to serve file", [
-            'issue_id' => $id,
-            'db_path' => $issue->file_path,
-            'accel_path' => $accelPath,
-            'physical_path_check' => $physicalPath,
-            'exists' => file_exists($physicalPath) ? 'YES' : 'NO',
-            'file_size' => file_exists($physicalPath) ? filesize($physicalPath) : 0
-        ]);
 
-        return response('', 200, [
-            'X-Accel-Redirect' => $accelPath,
-            'X-Accel-Buffering' => 'no',
+        // On production (Nginx): use X-Accel-Redirect for efficient file serving
+        if ($this->isNginx()) {
+            $accelPath = '/_protected/public/' . $issue->file_path;
+            \Log::channel('single')->info("PDF Debug: Serving via X-Accel-Redirect", [
+                'issue_id' => $id,
+                'accel_path' => $accelPath,
+                'exists' => file_exists($physicalPath) ? 'YES' : 'NO',
+            ]);
+            return response('', 200, [
+                'X-Accel-Redirect' => $accelPath,
+                'X-Accel-Buffering' => 'no',
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="issue_' . $issue->id . '.pdf"',
+                'Content-Length' => file_exists($physicalPath) ? filesize($physicalPath) : 0,
+                'Accept-Ranges' => 'bytes',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            ]);
+        }
+
+        // Development (php artisan serve): stream file directly
+        return response()->file($physicalPath, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="issue_' . $issue->id . '.pdf"',
-            'Content-Length' => file_exists($physicalPath) ? filesize($physicalPath) : 0,
-            'Accept-Ranges' => 'bytes',
-            'Cache-Control' => 'no-cache, no-store, must-revalidate',
         ]);
     }
 

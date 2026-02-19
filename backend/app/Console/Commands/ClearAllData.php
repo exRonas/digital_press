@@ -110,19 +110,50 @@ class ClearAllData extends Command
 
     private function deleteStorageDir(string $disk, string $path): void
     {
-        if (Storage::disk($disk)->exists($path)) {
-            $files = Storage::disk($disk)->allFiles($path);
-            $dirs  = Storage::disk($disk)->allDirectories($path);
+        $absolutePath = Storage::disk($disk)->path($path);
 
-            Storage::disk($disk)->deleteDirectory($path);
-            Storage::disk($disk)->makeDirectory($path); // воссоздаём пустую папку
-
-            $this->line(
-                "      [{$disk}] {$path}: удалено файлов — " . count($files) .
-                ', директорий — ' . count($dirs)
-            );
-        } else {
+        if (!is_dir($absolutePath)) {
             $this->line("      [{$disk}] {$path}: не существует, пропускаем.");
+            return;
+        }
+
+        // Use native PHP recursive delete to avoid Flysystem crashes on broken symlinks
+        $fileCount = 0;
+        $dirCount  = 0;
+        $this->nativeDeleteDir($absolutePath, $fileCount, $dirCount);
+
+        // Recreate empty directory
+        @mkdir($absolutePath, 0755, true);
+
+        $this->line("      [{$disk}] {$path}: удалено файлов — {$fileCount}, директорий — {$dirCount}");
+    }
+
+    private function nativeDeleteDir(string $dir, int &$fileCount, int &$dirCount): void
+    {
+        $items = @scandir($dir);
+        if ($items === false) {
+            return;
+        }
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+            $fullPath = $dir . DIRECTORY_SEPARATOR . $item;
+            // Use lstat to safely check even broken symlinks
+            $stat = @lstat($fullPath);
+            if ($stat === false) {
+                // Inaccessible — try to unlink anyway
+                @unlink($fullPath);
+                continue;
+            }
+            if (is_link($fullPath) || is_file($fullPath)) {
+                @unlink($fullPath);
+                $fileCount++;
+            } elseif (is_dir($fullPath)) {
+                $this->nativeDeleteDir($fullPath, $fileCount, $dirCount);
+                @rmdir($fullPath);
+                $dirCount++;
+            }
         }
     }
 }

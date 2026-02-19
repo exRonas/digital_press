@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 use App\Models\Publication;
 use App\Models\Issue;
-use App\Jobs\ProcessOcrJob;
+use App\Jobs\PrepareIssueJob;
 use Carbon\Carbon;
 use Str;
 
@@ -82,6 +82,18 @@ class ImportIssues extends Command
             $this->line("Found: [{$publication->title_ru}] Date: $date No: $number Lang: $language");
 
             if (!$dryRun) {
+                // Check DB first — skip if issue with same publication+date+number already exists
+                $existingIssue = Issue::where('publication_id', $publication->id)
+                    ->where('issue_date', $date)
+                    ->where('issue_number', $number)
+                    ->first();
+
+                if ($existingIssue && !$force) {
+                    $this->warn("Skipping [$filename]: Issue already exists in DB (ID: {$existingIssue->id}).");
+                    $skipped++;
+                    continue;
+                }
+
                 // Determine target path
                 // We physically copy the file to Laravel storage
                 $storageDir = "issues/" . $publication->id . "/" . Carbon::parse($date)->format('Y');
@@ -106,10 +118,17 @@ class ImportIssues extends Command
                         'created_by' => 1, // Admin
                     ]);
                     
-                    // Dispatch OCR/Thumbnail Job
-                    // We assume ProcessOcrJob exists and handles generation
+                    // Init stats (required for views/downloads counting to work)
+                    $issue->stats()->create([]);
+
+                    // Init OCR status
+                    $issue->ocrResult()->create(['status' => 'queued']);
+
+                    // Dispatch PrepareIssueJob (default queue): compress + thumbnail.
+                    // That job will then dispatch ProcessOcrJob on the 'ocr' queue
+                    // which is handled by the persistent start_worker.
                     try {
-                        dispatch(new ProcessOcrJob($issue));
+                        dispatch(new PrepareIssueJob($issue));
                     } catch (\Exception $e) {
                         $this->error("Error dispatching job for Issue ID {$issue->id}: " . $e->getMessage());
                     }

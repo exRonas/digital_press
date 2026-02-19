@@ -73,31 +73,40 @@ Write-Log "Lock file created."
 try {
     # 4. Run import
     Write-Log "Running import:issues..."
-    $importOutput = & php artisan import:issues "$ImportPath" --force 2>&1
+    $importOutput = & php artisan import:issues "$ImportPath" 2>&1
     $importOutput | ForEach-Object { Write-Log "  [import] $_" }
 
     if ($LASTEXITCODE -ne 0) {
-        Write-Log "import:issues failed (exit code $LASTEXITCODE)." "ERROR"
-        exit 1
+        throw "import:issues failed (exit code $LASTEXITCODE)."
     }
     Write-Log "Import finished."
 
-    # 5. Process queue (wait until all OCR/thumbnail jobs complete)
-    Write-Log "Running queue:work --stop-when-empty ..."
-    $queueOutput = & php artisan queue:work --stop-when-empty --tries=3 --timeout=600 2>&1
-    $queueOutput | ForEach-Object { Write-Log "  [queue] $_" }
-    Write-Log "Queue processed."
+    # Parse how many files were actually imported
+    $importedLine = $importOutput | Select-String -Pattern 'Imported:\s*(\d+)' | Select-Object -Last 1
+    $importedCount = 0
+    if ($importedLine -and $importedLine.Matches.Groups[1].Value) {
+        $importedCount = [int]$importedLine.Matches.Groups[1].Value
+    }
 
-    # 6. Final stats
-    $pendingAfter = Get-OcrPendingCount
-    Write-Log "OCR tasks remaining in queue: $pendingAfter"
+    if ($importedCount -eq 0) {
+        Write-Log "No new files imported - skipping queue processing."
+    } else {
+        # 5. Process queue (wait until all OCR/thumbnail jobs complete)
+        Write-Log "Imported $importedCount file(s). Running queue:work --queue=default --stop-when-empty ..."
+        $queueOutput = & php artisan queue:work --stop-when-empty --queue=default --tries=3 --timeout=600 2>&1
+        $queueOutput | ForEach-Object { Write-Log "  [queue] $_" }
+        Write-Log "Queue processed."
+
+        # 6. Final stats
+        $pendingAfter = Get-OcrPendingCount
+        Write-Log "OCR tasks remaining in queue: $pendingAfter"
+    }
     Write-Log "Auto-import completed successfully."
 
 } catch {
-    Write-Log "Unexpected error: $_" "ERROR"
-    exit 1
+    Write-Log "ERROR: $_" "ERROR"
 } finally {
-    # 7. Always remove lock
+    # 7. Always remove lock — runs even on exit/throw
     if (Test-Path $LockFile) {
         Remove-Item $LockFile -Force
         Write-Log "Lock file removed."

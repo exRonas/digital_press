@@ -23,6 +23,7 @@ class ProcessOcrJob implements ShouldQueue
     public function __construct(Issue $issue)
     {
         $this->issue = $issue;
+        $this->onQueue('ocr');
     }
 
     public function handle(): void
@@ -84,13 +85,8 @@ class ProcessOcrJob implements ShouldQueue
             sort($files, SORT_NATURAL);
             Log::info("[OCR] Found " . count($files) . " page images");
 
-            // 2.1 Generate thumbnail from PDF (before OCR processing)
-            Log::info("[OCR] Generating thumbnail...");
-            $this->generateThumbnail($pdfPath);
-
-            // 2.2 Compress PDF with Ghostscript
-            Log::info("[OCR] Compressing PDF...");
-            $this->compressPdf($pdfPath);
+            // Note: thumbnail and compression are handled by PrepareIssueJob
+            // which runs on the 'default' queue BEFORE this job.
 
             $tesseractPath = env('TESSERACT_PATH', 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe');
             $ocrLang = env('OCR_LANG', 'rus');

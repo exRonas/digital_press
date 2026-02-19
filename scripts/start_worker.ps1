@@ -3,4 +3,4 @@ Write-Host "This process handles PDF compression and OCR." -ForegroundColor Yell
 Write-Host "Do NOT close this window." -ForegroundColor Red
 
 cd ../backend
-php artisan queue:listen --tries=3 --timeout=600
+php artisan queue:listen --queue=ocr,default --tries=3 --timeout=600
